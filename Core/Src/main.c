@@ -25,7 +25,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
 #include "xsound.h"
+#include "i2c_slave.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,7 +59,46 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void setBoot0(void) {
+  // 檢查並設定 BOOT0 選項位元組
+  FLASH_OBProgramInitTypeDef OBInit;
 
+  // 讀取當前選項位元組
+  HAL_FLASHEx_OBGetConfig(&OBInit);
+
+  // 檢查是否需要修改 BOOT0 設定
+  uint32_t currentUserConfig = OBInit.USERConfig;
+
+  // 檢查 nSWBOOT0 和 nBOOT0 位元
+  if ((currentUserConfig & FLASH_OPTR_nSWBOOT0) || !(currentUserConfig & FLASH_OPTR_nBOOT0))
+  {
+    // 需要設定：nSWBOOT0=0 (軟體控制) 和 nBOOT0=1 (BOOT0=0，從主快閃記憶體啟動)
+
+    HAL_FLASH_Unlock();
+    HAL_FLASH_OB_Unlock();
+
+    OBInit.OptionType = OPTIONBYTE_USER;
+    OBInit.USERType = OB_USER_nSWBOOT0 | OB_USER_nBOOT0;
+
+    // 清除 nSWBOOT0 (設為0) 並設定 nBOOT0 (設為1)
+    OBInit.USERConfig = (currentUserConfig & ~FLASH_OPTR_nSWBOOT0) | FLASH_OPTR_nBOOT0;
+
+    if (HAL_FLASHEx_OBProgram(&OBInit) == HAL_OK)
+    {
+      HAL_FLASH_OB_Lock();
+      HAL_FLASH_Lock();
+
+      // 重新啟動以應用新的選項位元組
+      HAL_FLASH_OB_Launch();
+    }
+    else
+    {
+      HAL_FLASH_OB_Lock();
+      HAL_FLASH_Lock();
+      Error_Handler();
+    }
+  }
+}
 /* USER CODE END 0 */
 
 /**
@@ -77,7 +118,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  // setBoot0();  // 只在第一次燒錄時需要，之後可以註解掉
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -101,12 +142,22 @@ int main(void)
   XSound_Init(2, &htim2, TIM_CHANNEL_3, TIM_CHANNEL_4);  // ECHO3 on PA2, use TRIG3 on PB15
   XSound_Init(3, &htim5, TIM_CHANNEL_4, TIM_CHANNEL_3);  // ECHO4 on PA3, use TRIG4 on PB1
   
+  // Initialize I2C Slave
+  I2C_Slave_Init(&hi2c1);
+  
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+  while (1) {
+    // print a message every 2 seconds to indicate the system is running
+    // static uint32_t lastPrintTime = 0;
+    // uint32_t currentTime = HAL_GetTick();
+    // if (currentTime - lastPrintTime >= 2000) {
+    //   lastPrintTime = currentTime;
+    //   const char* msg = "System running...\r\n";
+    //   HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100);
+    // }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -127,10 +178,16 @@ int main(void)
     
     // Update all sensor distances
     XSound_UpdateAllDistances();
-    
-    // Access distances via XSound_GetAllDistances()
+
+    updateTxBuffer((uint8_t*)XSound_GetAllDistances(), XSOUND_NUM_SENSORS * sizeof(float));
+
+    // uart print all distances for debugging
     // float* distances = XSound_GetAllDistances();
-    // Now use distances[0], distances[1], distances[2], distances[3]
+    // char uartBuf[128];
+    // int len = sprintf(uartBuf, "Front:%.2f Right:%.2f Left:%.2f Back:%.2f cm\r\n", 
+    //                  distances[3], distances[1], distances[2], distances[0]);
+    // HAL_UART_Transmit(&huart1, (uint8_t*)uartBuf, len, 100);
+
   }
   /* USER CODE END 3 */
 }

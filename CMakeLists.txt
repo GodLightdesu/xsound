@@ -47,6 +47,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     Core/Src/main.c
     Core/Src/xsound.c
+    Core/Src/i2c_slave.c
 )
 
 # Add include paths
@@ -68,4 +69,9 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
 
     # Add user defined libraries
+)
+
+# Enable float printf support
+target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
+    -Wl,-u,_printf_float
 )

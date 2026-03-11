@@ -6,6 +6,12 @@
 #include <stdbool.h>
 
 #define XSOUND_NUM_SENSORS 4
+/* Sensor ID mapping:
+0: back
+1: right
+2: left
+3: front
+*/
 
 void XSound_Init(uint8_t sensorId, TIM_HandleTypeDef *htim, uint32_t channel1, uint32_t channel2);
 void XSound_Trig(uint8_t sensorId, GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin);
